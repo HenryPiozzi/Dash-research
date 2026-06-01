@@ -23,6 +23,7 @@ dashboard-enem-desigualdade/
 │
 ├── README.md         <- Documentação e guia do projeto (este arquivo).
 └── .gitignore        <- Configuração para impedir que arquivos de dados pesados sejam enviados ao GitHub.
+```
 
 ## Como o Grupo Deve Trabalhar (Fluxo de Desenvolvimento)
 
