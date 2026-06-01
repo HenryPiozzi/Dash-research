@@ -1,0 +1,24 @@
+# Ambiente Virtual (VENV)
+venv/
+.venv/
+env/
+ENV/
+
+# Arquivos temporários do Python (Compilados)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Jupyter Notebook (Arquivos temporários e checkpoints)
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+.local
+.chronicle
+
+# Arquivos do Sistema Operacional e Editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
