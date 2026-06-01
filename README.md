@@ -38,3 +38,11 @@ dashboard-enem-desigualdade/
     ```bash
     pip freeze > requirements.txt
     ```
+## Equipe
+
+| Nome | GitHub |
+|---|---|
+| Bruno Reitano Figuerola | [@Brunoreit](https://github.com/Brunoreit) |
+| Enzo Garofalo Pampana | [@enzo-garofalo](https://github.com/enzo-garofalo) |
+| Henry Gabriel Piozzi | [@HenryPiozzi](https://github.com/HenryPiozzi) |
+| Rogério Medina | [@RogerioMedina](https://github.com/RogerioMedina) |
