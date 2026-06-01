@@ -9,7 +9,7 @@ O projeto utiliza Python para todo o pipeline de ciência de dados (coleta, limp
 O projeto está organizado da seguinte forma para garantir a separação entre o processamento de dados pesados e a execução do dashboard:
 
 ```text
-dashboard-enem-desigualdade/
+ENEM-Data-Dashboard/
 │
 ├── data/
 │   ├── raw/          <- Arquivos originais e brutos (ex: CSV do ENEM). Nunca devem ser modificados.
