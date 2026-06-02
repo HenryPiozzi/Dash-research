@@ -22,3 +22,16 @@ __pycache__/
 Thumbs.db
 .vscode/
 .idea/
+
+# Dados brutos
+data/raw/*
+!data/raw/.gitkeep
+
+# Dados processados em CSV
+data/processed/*
+!data/processed/.gitkeep
+
+# Permite subir os zips processados
+data/zipped/*
+!data/zipped/.gitkeep
+!data/zipped/*.zip
