@@ -8,9 +8,8 @@ from dash import Dash, dcc, html, Input, Output
 import dash_bootstrap_components as dbc
 
 
-# ============================================================
+
 # CAMINHOS DO PROJETO
-# ============================================================
 
 PASTA_RAIZ = Path(__file__).resolve().parents[1]
 PASTA_PROCESSED = PASTA_RAIZ / "data" / "processed"
@@ -20,10 +19,11 @@ ARQUIVOS_DADOS = {
     "2023": PASTA_PROCESSED / "enem_2023_tratado.csv"
 }
 
+COR_PRINCIPAL = "#2c3e50"
+COR_DESTAQUE = "#18bc9c"
 
-# ============================================================
 # MAPAS DE TRADUÇÃO
-# ============================================================
+
 
 MAPA_RENDA = {
     "A": "Nenhuma renda",
@@ -71,9 +71,9 @@ MAPA_LOCALIZACAO = {
 }
 
 
-# ============================================================
+
 # CARREGAMENTO E PREPARAÇÃO DOS DADOS
-# ============================================================
+
 
 def carregar_dados():
     bases = []
@@ -136,6 +136,8 @@ def carregar_dados():
 
     if "TP_LOCALIZACAO_ESC" in df.columns:
         df["LOCALIZACAO_ESCOLA"] = df["TP_LOCALIZACAO_ESC"].map(MAPA_LOCALIZACAO)
+    
+    df = df[df["TIPO_ESCOLA"] != "Não respondeu"]
 
     return df
 
@@ -143,9 +145,35 @@ def carregar_dados():
 df = carregar_dados()
 
 
-# ============================================================
+def gerar_agregados_macro(dataframe):
+    agregados = {}
+    chaves = ["Todos"] + list(dataframe["ANO_BASE"].unique())
+    
+    for c in chaves:
+        sub_df = dataframe if c == "Todos" else dataframe[dataframe["ANO_BASE"] == c]
+        
+        agregados[c] = {
+            "total": len(sub_df),
+            "media": sub_df["MEDIA_GERAL"].mean(),
+            "renda_comum": sub_df["RENDA_FAMILIAR"].mode().iloc[0] if "RENDA_FAMILIAR" in sub_df.columns and not sub_df["RENDA_FAMILIAR"].dropna().empty else "N/A",
+            "pct_internet": sub_df["ACESSO_INTERNET"].eq("Sim").mean() * 100 if "ACESSO_INTERNET" in sub_df.columns else 0,
+            
+            "df_escola": sub_df["TIPO_ESCOLA"].value_counts().reset_index(name="TOTAL"),
+            
+            "df_renda": sub_df.dropna(subset=["RENDA_FAMILIAR"]).groupby("RENDA_FAMILIAR", as_index=False)["MEDIA_GERAL"].mean(),
+            
+            "df_dependencia": sub_df.dropna(subset=["DEPENDENCIA_ESCOLA"]).groupby("DEPENDENCIA_ESCOLA", as_index=False)["MEDIA_GERAL"].mean().sort_values("MEDIA_GERAL", ascending=False)
+        }
+    return agregados
+
+
+DADOS_AGREGADOS_DASH1 = gerar_agregados_macro(df)
+
+# menor amostra de dispersão para o dash2
+DF_SAMPLE_DASH2 = df.sample(min(len(df), 5000), random_state=42) if not df.empty else df
+
 # APP
-# ============================================================
+
 
 app = Dash(
     __name__,
@@ -156,51 +184,42 @@ app = Dash(
 server = app.server
 
 
-# ============================================================
-# FUNÇÕES VISUAIS
-# ============================================================
 
-def aplicar_layout_padrao(fig):
+# FUNÇÕES VISUAIS
+
+
+def aplicar_layout_padrao(fig, titulo_limpo=""):
     fig.update_layout(
         template="plotly_white",
-        margin=dict(l=30, r=30, t=40, b=70),
+        margin=dict(l=40, r=30, t=50, b=50),
+        title=dict(text=titulo_limpo, font=dict(size=15, color=COR_PRINCIPAL, family="sans-serif")),
         paper_bgcolor="white",
         plot_bgcolor="white",
-        font=dict(size=12),
-        title_font=dict(size=16),
-        legend_title_text=""
+        font=dict(size=11, color="#7f8c8d")
     )
     return fig
 
 
 def criar_card_indicador(titulo, valor, descricao):
     return dbc.Card(
-        dbc.CardBody(
-            [
-                html.H6(titulo, className="card-title text-muted"),
-                html.H2(valor, className="fw-bold text-primary"),
-                html.P(descricao, className="mb-0 text-muted small")
-            ]
-        ),
+        dbc.CardBody([
+            html.H6(titulo, className="card-title text-muted small uppercase text-center"),
+            html.H2(valor, className="fw-bold text-center my-2", style={"color": COR_PRINCIPAL}),
+            html.P(descricao, className="mb-0 text-muted small text-center")
+        ]),
         className="shadow-sm border-0 h-100"
     )
 
 
-def figura_sem_dados(mensagem="Nenhum dado encontrado para os filtros selecionados."):
+def figura_sem_dados():
     fig = go.Figure()
-    fig.update_layout(
-        template="plotly_white",
-        title=mensagem,
-        xaxis_visible=False,
-        yaxis_visible=False,
-        margin=dict(l=30, r=30, t=40, b=40)
-    )
+    fig.update_layout(template="plotly_white", title="Nenhum dado encontrado para os filtros.", xaxis_visible=False, yaxis_visible=False)
     return fig
 
 
-# ============================================================
+
 # LAYOUTS DAS ABAS
-# ============================================================
+
 
 def layout_visao_geral():
     anos_disponiveis = sorted(df["ANO_BASE"].dropna().unique())
@@ -225,7 +244,7 @@ def layout_visao_geral():
                     ),
                     dbc.Col(
                         [
-                            html.Label("Ano da base:", className="fw-bold"),
+                            html.Label("Filtrar ano Letivo:", className="fw-bold"),
                             dcc.Dropdown(
                                 id="filtro-ano-visao",
                                 options=[{"label": "Todos", "value": "Todos"}] + [
@@ -467,9 +486,9 @@ def layout_escolas():
     )
 
 
-# ============================================================
+
 # LAYOUT PRINCIPAL
-# ============================================================
+
 
 app.layout = dbc.Container(
     fluid=True,
@@ -479,7 +498,7 @@ app.layout = dbc.Container(
                 [
                     html.H1(
                         "O Raio-X da Desigualdade no ENEM",
-                        className="text-center my-4 text-primary fw-bold"
+                        className="text-center my-4 text-primary fw-bold", style={"color": COR_PRINCIPAL}
                     ),
                     html.P(
                         "Análise dos microdados do ENEM com foco em desempenho, renda familiar, acesso à internet e perfil escolar.",
@@ -517,9 +536,9 @@ app.layout = dbc.Container(
 )
 
 
-# ============================================================
+
 # CALLBACK — DASHBOARD 1
-# ============================================================
+
 
 @app.callback(
     Output("card-participantes", "children"),
@@ -533,170 +552,43 @@ app.layout = dbc.Container(
     Input("filtro-ano-visao", "value")
 )
 def atualizar_visao_geral(ano_selecionado):
-    if ano_selecionado == "Todos":
-        dados = df.copy()
-    else:
-        dados = df[df["ANO_BASE"] == ano_selecionado].copy()
 
-    total_participantes = len(dados)
-    media_geral = dados["MEDIA_GERAL"].mean()
+    cache = DADOS_AGREGADOS_DASH1[ano_selecionado]
 
-    if "RENDA_FAMILIAR" in dados.columns and not dados["RENDA_FAMILIAR"].dropna().empty:
-        renda_mais_comum = dados["RENDA_FAMILIAR"].mode().iloc[0]
-    else:
-        renda_mais_comum = "Não disponível"
+    card_participantes = criar_card_indicador("Amostra Analisada", f"{cache['total']:,.0f}".replace(",", "."), "Total de candidatos")
+    card_media = criar_card_indicador("Nota Média Geral", f"{cache['media']:.1f}", "Desempenho nacional unificado")
+    card_renda = criar_card_indicador("Renda Predominante", cache["renda_comum"], "Moda socioeconômica familiar")
+    card_internet = criar_card_indicador("Acesso à Internet", f"{cache['pct_internet']:.1f}%", "Candidatos conectados em casa")
 
-    if "ACESSO_INTERNET" in dados.columns and not dados["ACESSO_INTERNET"].dropna().empty:
-        percentual_internet = dados["ACESSO_INTERNET"].eq("Sim").mean() * 100
-    else:
-        percentual_internet = 0
+    # grafico1 - Evolução Anual
+    df_media_ano = df.groupby("ANO_BASE", as_index=False)["MEDIA_GERAL"].mean()
+    fig_media_ano = px.bar(df_media_ano, x="ANO_BASE", y="MEDIA_GERAL", text_auto=".1f", color_discrete_sequence=[COR_PRINCIPAL])
+    fig_media_ano.update_yaxes(range=[400, 650])
 
-    card_participantes = criar_card_indicador(
-        "Amostra analisada",
-        f"{total_participantes:,.0f}".replace(",", "."),
-        "Total de registros analisados"
-    )
+    # grafico2 - Tipo de Escola
+    fig_tipo_escola = px.pie(cache["df_escola"], names="TIPO_ESCOLA", values="TOTAL", hole=0.5, color_discrete_sequence=[COR_PRINCIPAL, COR_DESTAQUE])
+    aplicar_layout_padrao(fig_tipo_escola, "Proporção de Alunos por Rede de Ensino")
 
-    card_media = criar_card_indicador(
-        "Nota média geral",
-        f"{media_geral:.1f}",
-        "Média entre as áreas do ENEM"
-    )
+    # grafico3 - storytelling aplicado
+    df_renda = cache["df_renda"].copy()
+    df_renda["RENDA_FAMILIAR"] = pd.Categorical(df_renda["RENDA_FAMILIAR"], categories=ORDEM_RENDA, ordered=True)
+    df_renda = df_renda.sort_values("RENDA_FAMILIAR")
+    
+    fig_renda = px.bar(df_renda, x="MEDIA_GERAL", y="RENDA_FAMILIAR", orientation="h", color_discrete_sequence=[COR_PRINCIPAL])
+    fig_renda.update_xaxes(range=[350, 680])
+    aplicar_layout_padrao(fig_renda, "Média Geral por Faixa de Renda")
 
-    card_renda = criar_card_indicador(
-        "Renda predominante",
-        renda_mais_comum,
-        "Faixa de renda familiar mais frequente"
-    )
+    # grafico4 - dependencia administrativa
+    fig_dependencia = px.bar(cache["df_dependencia"], x="DEPENDENCIA_ESCOLA", y="MEDIA_GERAL", text_auto=".1f", color_discrete_sequence=[COR_DESTAQUE])
+    fig_dependencia.update_yaxes(range=[400, 650])
+    aplicar_layout_padrao(fig_dependencia, "Desempenho Médio por Dependência Administrativa")
 
-    card_internet = criar_card_indicador(
-        "Acesso à internet",
-        f"{percentual_internet:.1f}%",
-        "Participantes com internet em casa"
-    )
-
-    # Gráfico 1 — Média por ano
-    df_media_ano = (
-        dados.groupby("ANO_BASE", as_index=False)["MEDIA_GERAL"]
-        .mean()
-        .sort_values("ANO_BASE")
-    )
-
-    fig_media_ano = px.bar(
-        df_media_ano,
-        x="ANO_BASE",
-        y="MEDIA_GERAL",
-        text_auto=".1f",
-        labels={
-            "ANO_BASE": "Ano",
-            "MEDIA_GERAL": "Média geral"
-        }
-    )
-
-    fig_media_ano.update_yaxes(range=[300, 700])
-    fig_media_ano = aplicar_layout_padrao(fig_media_ano)
-
-    # Gráfico 2 — Tipo de escola
-    if "TIPO_ESCOLA" in dados.columns:
-        df_tipo_escola = (
-            dados["TIPO_ESCOLA"]
-            .fillna("Não informado")
-            .value_counts()
-            .reset_index()
-        )
-
-        df_tipo_escola.columns = ["TIPO_ESCOLA", "TOTAL"]
-
-        fig_tipo_escola = px.pie(
-            df_tipo_escola,
-            names="TIPO_ESCOLA",
-            values="TOTAL",
-            hole=0.45
-        )
-    else:
-        fig_tipo_escola = figura_sem_dados("Coluna TIPO_ESCOLA não encontrada.")
-
-    fig_tipo_escola = aplicar_layout_padrao(fig_tipo_escola)
-
-    # Gráfico 3 — Média por renda
-    if "RENDA_FAMILIAR" in dados.columns:
-        df_renda = (
-            dados.dropna(subset=["RENDA_FAMILIAR"])
-            .groupby("RENDA_FAMILIAR", as_index=False)["MEDIA_GERAL"]
-            .mean()
-        )
-
-        df_renda["RENDA_FAMILIAR"] = pd.Categorical(
-            df_renda["RENDA_FAMILIAR"],
-            categories=ORDEM_RENDA,
-            ordered=True
-        )
-
-        df_renda = df_renda.sort_values("RENDA_FAMILIAR")
-
-        fig_renda = px.bar(
-            df_renda,
-            x="RENDA_FAMILIAR",
-            y="MEDIA_GERAL",
-            labels={
-                "RENDA_FAMILIAR": "Renda familiar",
-                "MEDIA_GERAL": "Média geral"
-            }
-        )
-
-        fig_renda.update_xaxes(
-            categoryorder="array",
-            categoryarray=ORDEM_RENDA,
-            tickangle=-45
-        )
-
-        fig_renda.update_yaxes(range=[300, 700])
-        fig_renda = aplicar_layout_padrao(fig_renda)
-
-    else:
-        fig_renda = figura_sem_dados("Coluna RENDA_FAMILIAR não encontrada.")
-
-    # Gráfico 4 — Dependência administrativa
-    if "DEPENDENCIA_ESCOLA" in dados.columns:
-        df_dependencia = (
-            dados.dropna(subset=["DEPENDENCIA_ESCOLA"])
-            .groupby("DEPENDENCIA_ESCOLA", as_index=False)["MEDIA_GERAL"]
-            .mean()
-            .sort_values("MEDIA_GERAL", ascending=False)
-        )
-
-        fig_dependencia = px.bar(
-            df_dependencia,
-            x="DEPENDENCIA_ESCOLA",
-            y="MEDIA_GERAL",
-            text_auto=".1f",
-            labels={
-                "DEPENDENCIA_ESCOLA": "Dependência administrativa",
-                "MEDIA_GERAL": "Média geral"
-            }
-        )
-
-        fig_dependencia.update_yaxes(range=[300, 700])
-        fig_dependencia = aplicar_layout_padrao(fig_dependencia)
-
-    else:
-        fig_dependencia = figura_sem_dados("Coluna DEPENDENCIA_ESCOLA não encontrada.")
-
-    return (
-        card_participantes,
-        card_media,
-        card_renda,
-        card_internet,
-        fig_media_ano,
-        fig_tipo_escola,
-        fig_renda,
-        fig_dependencia
-    )
+    return card_participantes, card_media, card_renda, card_internet, fig_media_ano, fig_tipo_escola, fig_renda, fig_dependencia
 
 
-# ============================================================
+
 # CALLBACK — DASHBOARD 2
-# ============================================================
+
 
 @app.callback(
     Output("grafico-dinamico-dispersao", "figure"),
@@ -722,92 +614,38 @@ def atualizar_dashboard_socioeconomico(ano, tipo_escola, renda):
         fig_vazia = figura_sem_dados()
         return fig_vazia, fig_vazia, fig_vazia
 
-    # Gráfico dinâmico — Dispersão média geral x redação
-    fig_dispersao = px.scatter(
-        dados.sample(min(len(dados), 8000), random_state=42),
-        x="MEDIA_GERAL",
+    # grafico1 - mapa de densidade dinâmico
+    fig_dispersao = px.density_heatmap(
+        dados, 
+        x="MEDIA_GERAL", 
         y="NU_NOTA_REDACAO",
-        opacity=0.35,
-        labels={
-            "MEDIA_GERAL": "Média geral",
-            "NU_NOTA_REDACAO": "Nota da redação",
-            "RENDA_FAMILIAR": "Renda familiar"
-        },
-        hover_data=[
-            "ANO_BASE",
-            "TIPO_ESCOLA",
-            "RENDA_FAMILIAR",
-            "ACESSO_INTERNET"
-        ]
+        nbinsx=40,
+        nbinsy=40,
+        color_continuous_scale="Blues", # <-- A mágica visual acontece aqui
+        labels={"MEDIA_GERAL": "Média do Candidato", "NU_NOTA_REDACAO": "Nota de Redação"}
     )
+    fig_dispersao = aplicar_layout_padrao(fig_dispersao, "Concentração: Média Geral vs Redação")
 
-    fig_dispersao.update_xaxes(range=[300, 800])
-    fig_dispersao.update_yaxes(range=[0, 1000])
-    fig_dispersao = aplicar_layout_padrao(fig_dispersao)
+    # grafico2 - Boxplot de Renda Horizontal
+    dados_box = dados.dropna(subset=["RENDA_FAMILIAR", "NU_NOTA_REDACAO"]).copy()
+    dados_box["RENDA_FAMILIAR"] = pd.Categorical(dados_box["RENDA_FAMILIAR"], categories=ORDEM_RENDA, ordered=True)
+    dados_box = dados_box.sort_values("RENDA_FAMILIAR")
+    
+    fig_box = px.box(dados_box, y="RENDA_FAMILIAR", x="NU_NOTA_REDACAO", orientation="h", color_discrete_sequence=[COR_DESTAQUE])
+    aplicar_layout_padrao(fig_box, "Dispersão e Quartis da Nota de Redação por Renda")
 
-    # Boxplot — Redação por renda familiar
-    if "RENDA_FAMILIAR" in dados.columns:
-        dados_box = dados.dropna(subset=["RENDA_FAMILIAR", "NU_NOTA_REDACAO"]).copy()
-
-        dados_box["RENDA_FAMILIAR"] = pd.Categorical(
-            dados_box["RENDA_FAMILIAR"],
-            categories=ORDEM_RENDA,
-            ordered=True
-        )
-
-        dados_box = dados_box.sort_values("RENDA_FAMILIAR")
-
-        fig_box = px.box(
-            dados_box,
-            x="RENDA_FAMILIAR",
-            y="NU_NOTA_REDACAO",
-            labels={
-                "RENDA_FAMILIAR": "Renda familiar",
-                "NU_NOTA_REDACAO": "Nota da redação"
-            }
-        )
-
-        fig_box.update_xaxes(
-            categoryorder="array",
-            categoryarray=ORDEM_RENDA,
-            tickangle=-45
-        )
-
-        fig_box.update_yaxes(range=[0, 1000])
-        fig_box = aplicar_layout_padrao(fig_box)
-    else:
-        fig_box = figura_sem_dados("Coluna RENDA_FAMILIAR não encontrada.")
-
-    # Média por acesso à internet
-    if "ACESSO_INTERNET" in dados.columns:
-        df_internet = (
-            dados.dropna(subset=["ACESSO_INTERNET"])
-            .groupby("ACESSO_INTERNET", as_index=False)["MEDIA_GERAL"]
-            .mean()
-        )
-
-        fig_internet = px.bar(
-            df_internet,
-            x="ACESSO_INTERNET",
-            y="MEDIA_GERAL",
-            text_auto=".1f",
-            labels={
-                "ACESSO_INTERNET": "Acesso à internet",
-                "MEDIA_GERAL": "Média geral"
-            }
-        )
-
-        fig_internet.update_yaxes(range=[300, 700])
-        fig_internet = aplicar_layout_padrao(fig_internet)
-    else:
-        fig_internet = figura_sem_dados("Coluna ACESSO_INTERNET não encontrada.")
+    # grafico3 - filtro de internet
+    df_internet = dados.dropna(subset=["ACESSO_INTERNET"]).groupby("ACESSO_INTERNET", as_index=False)["MEDIA_GERAL"].mean()
+    fig_internet = px.bar(df_internet, x="ACESSO_INTERNET", y="MEDIA_GERAL", text_auto=".1f", color_discrete_sequence=[COR_PRINCIPAL])
+    fig_internet.update_yaxes(range=[400, 650])
+    aplicar_layout_padrao(fig_internet, "Impacto Conectividade: Média por Presença de Internet")
 
     return fig_dispersao, fig_box, fig_internet
 
 
-# ============================================================
+
 # EXECUÇÃO
-# ============================================================
+
 
 if __name__ == "__main__":
     app.run(debug=True)
