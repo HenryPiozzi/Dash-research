@@ -35,3 +35,7 @@ data/processed/*
 data/zipped/*
 !data/zipped/.gitkeep
 !data/zipped/*.zip
+
+# Dados limpos
+data/analytics/*
+!data/analytics/.gitkeep
