@@ -3,7 +3,7 @@ import pandas as pd
 import shutil
 
 
-ANOS_DESEJADOS = ["2022", "2023"]
+ANOS_DESEJADOS = ["2022"]
 
 PASTA_RAIZ = Path(__file__).resolve().parents[1]
 PASTA_DATA = PASTA_RAIZ / "data"
@@ -31,6 +31,9 @@ COLUNAS_DESEJADAS = [
     "TP_DEPENDENCIA_ADM_ESC",
     "TP_LOCALIZACAO_ESC",
     "TP_SIT_FUNC_ESC",
+    "CO_MUNICIPIO_PROVA",
+    "NO_MUNICIPIO_PROVA",
+
 
     # Dados socioeconômicos
     "Q006",  # renda familiar
