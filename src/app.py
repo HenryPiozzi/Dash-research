@@ -1,29 +1,40 @@
 from pathlib import Path
 
+import dash_bootstrap_components as dbc
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from dash import Dash, dcc, html, Input, Output
-import dash_bootstrap_components as dbc
-
+from dash import Dash, Input, Output, dcc, html
 
 # ── Caminhos ──────────────────────────────────────────────────────────────────
 
 PASTA_ANALYTICS = Path(__file__).resolve().parents[1] / "data" / "analytics"
 
 
-# ── Paleta ────────────────────────────────────────────────────────────────────
+# ── Paleta do deck de apresentação — fonte única da verdade ───────────────────
 
-AZUL_ESCURO = "#1a2e4a"
-AZUL_MEDIO  = "#2563eb"
-VERDE_AGUA  = "#0d9488"
-LARANJA     = "#f97316"
-CINZA_CLARO = "#f1f5f9"
-CINZA_TEXTO = "#64748b"
-BRANCO      = "#ffffff"
+NAVY       = "#2C3E50"   # estrutural: header, títulos, texto forte
+TEAL       = "#18BC9C"   # acento primário / destaques
+BODY       = "#546E7A"   # texto corrido
+MUTED      = "#90A4AE"   # labels, legendas
+CARD       = "#F4F7FA"   # fundo de cartões
+TINT       = "#E8F8F5"   # realces suaves
+BORDER     = "#E2E8F0"   # bordas
+CINZA_AZUL = "#8FA3B0"   # cinza-azulado (substitui laranja — sem alaranjado no deck)
+BRANCO     = "#FFFFFF"
 
-PALETA_SEQ = [AZUL_ESCURO, AZUL_MEDIO, VERDE_AGUA, "#38bdf8", "#7dd3fc"]
-PALETA_CAT = [AZUL_MEDIO, VERDE_AGUA, LARANJA, "#8b5cf6", "#ec4899"]
+# Aliases para compatibilidade com referências no restante do arquivo
+AZUL_ESCURO = NAVY
+AZUL_MEDIO  = TEAL
+VERDE_AGUA  = TEAL
+LARANJA     = CINZA_AZUL
+CINZA_CLARO = CARD
+CINZA_TEXTO = BODY
+
+# Paletas — sequencial TINT→TEAL→NAVY em 5 passos (5 categorias de porte)
+PALETA_SEQ = [TINT, "#45C9A4", TEAL, "#12907A", NAVY]
+PALETA_CAT = [TEAL, NAVY, CINZA_AZUL, "#0E7C66", "#5C8A99"]
+PORTE_CORES = ["#86D9C8", "#34C4A8", "#18BC9C", "#0E7C66", "#2C3E50"]
 
 
 # ── Dados ─────────────────────────────────────────────────────────────────────
@@ -95,10 +106,10 @@ def _layout(fig, titulo=""):
     fig.update_layout(
         template="plotly_white",
         margin=dict(l=40, r=20, t=45, b=50),
-        title=dict(text=titulo, font=dict(size=13, color=AZUL_ESCURO, family="Georgia, serif")),
+        title=dict(text=titulo, font=dict(size=13, color=NAVY, family="Poppins, sans-serif")),
         paper_bgcolor=BRANCO,
-        plot_bgcolor=CINZA_CLARO,
-        font=dict(size=11, color=CINZA_TEXTO),
+        plot_bgcolor=BRANCO,
+        font=dict(size=11, color=BODY),
         legend=dict(bgcolor="rgba(0,0,0,0)"),
     )
     return fig
@@ -111,29 +122,30 @@ def _vazio_fig(msg="Sem dados para os filtros selecionados"):
         annotations=[dict(
             text=msg, showarrow=False, x=.5, y=.5,
             xref="paper", yref="paper",
-            font=dict(size=14, color=CINZA_TEXTO),
+            font=dict(size=14, color=BODY),
         )],
     )
     return fig
 
 
-def _card(icone, titulo, valor, subtitulo, cor=AZUL_MEDIO):
+def _card(icone, titulo, valor, subtitulo, cor=TEAL):
     return dbc.Card(
         dbc.CardBody(
             html.Div([
                 html.Span(icone, style={"fontSize": "1.6rem"}),
                 html.Div([
                     html.P(titulo, className="mb-0",
-                           style={"fontSize": ".7rem", "color": CINZA_TEXTO,
+                           style={"fontSize": ".7rem", "color": BODY,
                                   "textTransform": "uppercase", "letterSpacing": "1px"}),
-                    html.H4(valor, className="mb-0 fw-bold", style={"color": AZUL_ESCURO}),
+                    html.H4(valor, className="mb-0 fw-bold", style={"color": NAVY}),
                     html.P(subtitulo, className="mb-0",
-                           style={"fontSize": ".75rem", "color": CINZA_TEXTO}),
+                           style={"fontSize": ".75rem", "color": BODY}),
                 ], className="ms-3"),
             ], className="d-flex align-items-center"),
         ),
         className="shadow-sm border-0 h-100",
-        style={"borderLeft": f"4px solid {cor} !important", "borderRadius": "10px"},
+        style={"borderLeft": f"4px solid {cor} !important", "borderRadius": "10px",
+               "backgroundColor": CARD},
     )
 
 
@@ -156,14 +168,14 @@ def _barras_renda(df_ag):
             y=df_ag["RENDA_FAMILIAR"].astype(str),
             x=df_ag["MEDIA_OBJETIVAS"],
             orientation="h",
-            marker_color=AZUL_MEDIO,
+            marker_color=NAVY,
         ),
         go.Bar(
             name="Redação",
             y=df_ag["RENDA_FAMILIAR"].astype(str),
             x=df_ag["MEDIA_REDACAO"],
             orientation="h",
-            marker_color=VERDE_AGUA,
+            marker_color=TEAL,
         ),
     ])
     fig.update_layout(barmode="group", xaxis_range=[350, 850])
@@ -183,32 +195,33 @@ def _barras_renda(df_ag):
 # ── Layouts das abas ──────────────────────────────────────────────────────────
 
 def _grafico_card(titulo, subtitulo=None, graph_id=None, altura=280):
-    corpo = [html.H6(titulo, className="fw-bold mb-1", style={"color": AZUL_ESCURO})]
+    corpo = [html.H6(titulo, className="fw-bold mb-1", style={"color": NAVY})]
     if subtitulo:
-        corpo.append(html.P(subtitulo, style={"fontSize": ".75rem", "color": CINZA_TEXTO}))
+        corpo.append(html.P(subtitulo, style={"fontSize": ".75rem", "color": BODY}))
     if graph_id:
         corpo.append(dcc.Graph(id=graph_id, config={"displayModeBar": False},
                                style={"height": f"{altura}px"}))
-    return dbc.Card(dbc.CardBody(corpo), className="shadow-sm border-0 h-100")
+    return dbc.Card(dbc.CardBody(corpo), className="shadow-sm border-0 h-100",
+                    style={"backgroundColor": CARD})
 
 
 def layout_visao_geral():
     r = df_resumo.iloc[0]
     cards = [
-        ("👥", "Participantes", f"{int(r['TOTAL_PARTICIPANTES']):,}".replace(",", "."),
-         "Candidatos com nota válida", AZUL_MEDIO),
-        ("📊", "Média Geral",     f"{r['MEDIA_GERAL']:.1f}",      "Todas as provas",     VERDE_AGUA),
-        ("✍️", "Média Redação",  f"{r['MEDIA_REDACAO']:.1f}",    "Competência escrita", LARANJA),
-        ("📐", "Média Objetivas", f"{r['MEDIA_OBJETIVAS']:.1f}",  "CN + CH + LC + MT",   AZUL_ESCURO),
-        ("🌐", "Com Internet",   f"{r['PERCENTUAL_COM_INTERNET']:.1f}%", "Acesso residencial", VERDE_AGUA),
-        ("🏙️", "Municípios",    f"{int(r['TOTAL_MUNICIPIOS_PROVA'])}",  "Com ao menos 1 prova", AZUL_MEDIO),
+        ("", "Participantes", f"{int(r['TOTAL_PARTICIPANTES']):,}".replace(",", "."),
+         "Candidatos com nota válida", TEAL),
+        ("", "Média Geral",     f"{r['MEDIA_GERAL']:.1f}",      "Todas as provas",     NAVY),
+        ("", "Média Redação",  f"{r['MEDIA_REDACAO']:.1f}",    "Competência escrita", TEAL),
+        ("", "Média Objetivas", f"{r['MEDIA_OBJETIVAS']:.1f}",  "CN + CH + LC + MT",   NAVY),
+        ("", "Com Internet",   f"{r['PERCENTUAL_COM_INTERNET']:.1f}%", "Acesso residencial", TEAL),
+        ("", "Municípios",    f"{int(r['TOTAL_MUNICIPIOS_PROVA'])}",  "Com ao menos 1 prova", NAVY),
     ]
     return dbc.Container(fluid=True, children=[
         html.Div([
             html.H4("Visão Geral Executiva",
-                    style={"fontFamily": "'Playfair Display', serif", "color": AZUL_ESCURO}),
+                    style={"fontFamily": "'Poppins', sans-serif", "color": NAVY}),
             html.P("Panorama nacional dos candidatos ao ENEM 2022.",
-                   style={"color": CINZA_TEXTO, "fontSize": ".9rem"}),
+                   style={"color": BODY, "fontSize": ".9rem"}),
         ], className="mb-4"),
 
         dbc.Row([dbc.Col(_card(*c), md=2) for c in cards], className="mb-4 g-3"),
@@ -236,7 +249,7 @@ def layout_socioeconomico():
     filtros = dbc.Card(dbc.CardBody(dbc.Row([
         dbc.Col([
             html.Label("Tipo de escola", className="fw-bold",
-                       style={"fontSize": ".8rem", "color": CINZA_TEXTO}),
+                       style={"fontSize": ".8rem", "color": BODY}),
             dcc.Dropdown(
                 id="f2-escola",
                 options=[{"label": "Todos", "value": "Todos"}] + [
@@ -249,7 +262,7 @@ def layout_socioeconomico():
         ], md=4),
         dbc.Col([
             html.Label("Acesso à internet", className="fw-bold",
-                       style={"fontSize": ".8rem", "color": CINZA_TEXTO}),
+                       style={"fontSize": ".8rem", "color": BODY}),
             dcc.Dropdown(
                 id="f2-internet",
                 options=[{"label": l, "value": v} for l, v in
@@ -259,7 +272,7 @@ def layout_socioeconomico():
         ], md=4),
         dbc.Col([
             html.Label("Faixa de renda (boxplot)", className="fw-bold",
-                       style={"fontSize": ".8rem", "color": CINZA_TEXTO}),
+                       style={"fontSize": ".8rem", "color": BODY}),
             dcc.Dropdown(
                 id="f2-renda",
                 options=[{"label": "Todas", "value": "Todas"}] +
@@ -267,14 +280,14 @@ def layout_socioeconomico():
                 value="Todas", clearable=False,
             ),
         ], md=4),
-    ])), className="shadow-sm border-0 mb-4")
+    ])), className="shadow-sm border-0 mb-4", style={"backgroundColor": CARD})
 
     return dbc.Container(fluid=True, children=[
         html.Div([
             html.H4("Desigualdade Socioeconômica",
-                    style={"fontFamily": "'Playfair Display', serif", "color": AZUL_ESCURO}),
+                    style={"fontFamily": "'Poppins', sans-serif", "color": NAVY}),
             html.P("Explore como renda, escola e conectividade moldam o desempenho.",
-                   style={"color": CINZA_TEXTO, "fontSize": ".9rem"}),
+                   style={"color": BODY, "fontSize": ".9rem"}),
         ], className="mb-4"),
         filtros,
         dbc.Row([
@@ -305,7 +318,7 @@ def layout_municipios():
     filtros = dbc.Card(dbc.CardBody(dbc.Row([
         dbc.Col([
             html.Label("UF da prova", className="fw-bold",
-                       style={"fontSize": ".8rem", "color": CINZA_TEXTO}),
+                       style={"fontSize": ".8rem", "color": BODY}),
             dcc.Dropdown(
                 id="f3-uf",
                 options=[{"label": "Todas", "value": "Todas"}] +
@@ -315,21 +328,21 @@ def layout_municipios():
         ], md=4),
         dbc.Col([
             html.Label("Mínimo de participantes por município", className="fw-bold",
-                       style={"fontSize": ".8rem", "color": CINZA_TEXTO}),
+                       style={"fontSize": ".8rem", "color": BODY}),
             dcc.Slider(
                 id="f3-min-part", min=50, max=2000, step=50, value=200,
                 marks={50: "50", 500: "500", 1000: "1k", 2000: "2k"},
                 tooltip={"placement": "bottom", "always_visible": False},
             ),
         ], md=8),
-    ])), className="shadow-sm border-0 mb-4")
+    ])), className="shadow-sm border-0 mb-4", style={"backgroundColor": CARD})
 
     return dbc.Container(fluid=True, children=[
         html.Div([
             html.H4("Contexto Municipal & IBGE",
-                    style={"fontFamily": "'Playfair Display', serif", "color": AZUL_ESCURO}),
+                    style={"fontFamily": "'Poppins', sans-serif", "color": NAVY}),
             html.P("Desempenho cruzado com dados populacionais do IBGE 2022.",
-                   style={"color": CINZA_TEXTO, "fontSize": ".9rem"}),
+                   style={"color": BODY, "fontSize": ".9rem"}),
         ], className="mb-4"),
         filtros,
         dbc.Row([
@@ -365,23 +378,23 @@ app = Dash(
     __name__,
     external_stylesheets=[
         dbc.themes.BOOTSTRAP,
-        "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700"
-        "&family=DM+Sans:wght@400;500&display=swap",
+        "https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap",
     ],
     suppress_callback_exceptions=True,
 )
 server = app.server
 
 _HEADER = {
-    "background": f"linear-gradient(135deg, {AZUL_ESCURO} 0%, #0f3460 100%)",
+    "background": "linear-gradient(135deg, #2C3E50 0%, #1b2a3a 100%)",
     "padding": "2rem 2.5rem 1.5rem",
 }
 
 app.layout = html.Div([
     html.Div([
         html.H1("O Raio-X da Desigualdade no ENEM",
-                style={"fontFamily": "'Playfair Display', serif",
-                       "color": BRANCO, "fontSize": "2rem", "marginBottom": ".3rem"}),
+                style={"fontFamily": "'Poppins', sans-serif",
+                       "color": BRANCO, "fontSize": "2rem", "marginBottom": ".3rem",
+                       "fontWeight": "700"}),
         html.P(
             "Microdados ENEM 2022 integrados a indicadores socioeconômicos do IBGE — "
             "análise de desempenho, renda familiar, acesso à internet e contexto municipal.",
@@ -391,16 +404,16 @@ app.layout = html.Div([
 
     dbc.Tabs([
         dbc.Tab(layout_visao_geral(),     label="① Visão Geral",      tab_id="tab1",
-                label_style={"fontFamily": "'DM Sans', sans-serif", "fontWeight": "500"}),
+                label_style={"fontFamily": "'Poppins', sans-serif", "fontWeight": "500"}),
         dbc.Tab(layout_socioeconomico(),  label="② Socioeconômico",   tab_id="tab2",
-                label_style={"fontFamily": "'DM Sans', sans-serif", "fontWeight": "500"}),
+                label_style={"fontFamily": "'Poppins', sans-serif", "fontWeight": "500"}),
         dbc.Tab(layout_municipios(),      label="③ Municípios & IBGE", tab_id="tab3",
-                label_style={"fontFamily": "'DM Sans', sans-serif", "fontWeight": "500"}),
+                label_style={"fontFamily": "'Poppins', sans-serif", "fontWeight": "500"}),
     ], active_tab="tab1",
-       style={"backgroundColor": CINZA_CLARO, "paddingLeft": "1.5rem",
-              "borderBottom": f"3px solid {AZUL_MEDIO}"}),
+       style={"backgroundColor": CARD, "paddingLeft": "1.5rem",
+              "borderBottom": "3px solid #18BC9C"}),
 
-], style={"fontFamily": "'DM Sans', sans-serif", "backgroundColor": CINZA_CLARO,
+], style={"fontFamily": "'Poppins', sans-serif", "backgroundColor": CARD,
           "minHeight": "100vh"})
 
 
@@ -428,7 +441,7 @@ def montar_visao_geral(_):
         df_internet.sort_values("MEDIA_GERAL"),
         x="MEDIA_GERAL", y="ACESSO_INTERNET", orientation="h",
         color="ACESSO_INTERNET",
-        color_discrete_map={"Sim": VERDE_AGUA, "Não": LARANJA},
+        color_discrete_map={"Sim": TEAL, "Não": CINZA_AZUL},
         text="MEDIA_GERAL",
     )
     fig_internet.update_traces(texttemplate="%{text:.1f}", textposition="outside")
@@ -443,7 +456,7 @@ def montar_visao_geral(_):
         y=df_renda["RENDA_FAMILIAR"].astype(str),
         orientation="h",
         color="MEDIA_GERAL",
-        color_continuous_scale=["#bfdbfe", AZUL_MEDIO, AZUL_ESCURO],
+        color_continuous_scale=[TINT, TEAL, NAVY],
         text="MEDIA_GERAL",
         labels={"MEDIA_GERAL": "Média Geral", "y": ""},
     )
@@ -484,7 +497,7 @@ def atualizar_socioeconomico(escola, internet, renda):
     else:
         fig_box = px.box(
             dados_box, y="RENDA_FAMILIAR", x="NU_NOTA_REDACAO", orientation="h",
-            color_discrete_sequence=[AZUL_MEDIO],
+            color_discrete_sequence=[TEAL],
             labels={"NU_NOTA_REDACAO": "Nota de Redação", "RENDA_FAMILIAR": ""},
         )
         _layout(fig_box)
@@ -525,7 +538,7 @@ def atualizar_socioeconomico(escola, internet, renda):
             dados_heat,
             x="MEDIA_OBJETIVAS", y="NU_NOTA_REDACAO",
             nbinsx=50, nbinsy=50,
-            color_continuous_scale="Blues",
+            color_continuous_scale=[[0, BRANCO], [0.5, TEAL], [1, NAVY]],
             labels={
                 "MEDIA_OBJETIVAS":   "Média das Provas Objetivas",
                 "NU_NOTA_REDACAO":   "Nota de Redação",
@@ -543,7 +556,6 @@ def atualizar_socioeconomico(escola, internet, renda):
             coloraxis_colorbar_title="Qtd.",
             bargap=0,
         )
-        # ← _layout chamado uma única vez, com o título que inclui n=
         _layout(fig_heat, f"Concentração: objetivas × redação — n = {n:,}".replace(",", "."))
 
     return fig_box, fig_bar, fig_heat
@@ -594,12 +606,13 @@ def atualizar_municipios(uf, min_part):
         hover_name="NO_MUNICIPIO_PROVA",
         hover_data={"SG_UF_PROVA": True, "TOTAL_PARTICIPANTES": True,
                     "POPULACAO_MUNICIPIO": True, "PORTE_MUNICIPIO": False},
-        color_discrete_sequence=PALETA_SEQ,
-        size_max=40, log_x=True,
+        color_discrete_sequence=PORTE_CORES,
+        size_max=34, log_x=True,
         labels={"POPULACAO_MUNICIPIO": "População (escala log)", "MEDIA_GERAL": "Média Geral"},
         category_orders={"PORTE_MUNICIPIO": ORDEM_PORTE},
     )
     _layout(fig_sc)
+    fig_sc.update_traces(marker=dict(opacity=0.78, line=dict(width=0.5, color="#2C3E50")))
 
     top15 = (
         df_m.sort_values("MEDIA_GERAL", ascending=False).head(15)
@@ -609,7 +622,7 @@ def atualizar_municipios(uf, min_part):
     fig_top = px.bar(
         top15, x="MEDIA_GERAL", y="LABEL", orientation="h",
         color="MEDIA_GERAL",
-        color_continuous_scale=["#bfdbfe", AZUL_MEDIO, AZUL_ESCURO],
+        color_continuous_scale=[TINT, TEAL, NAVY],
         text="MEDIA_GERAL",
         labels={"MEDIA_GERAL": "Média Geral", "LABEL": ""},
     )
