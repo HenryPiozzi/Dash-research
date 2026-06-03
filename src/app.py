@@ -1,3 +1,5 @@
+import json
+import urllib.request
 from pathlib import Path
 
 import dash_bootstrap_components as dbc
@@ -9,6 +11,29 @@ from dash import Dash, Input, Output, dcc, html
 # ── Caminhos ──────────────────────────────────────────────────────────────────
 
 PASTA_ANALYTICS = Path(__file__).resolve().parents[1] / "data" / "analytics"
+GEOJSON_CACHE   = Path(__file__).resolve().parents[1] / "data" / "uf_brasil.geojson"
+_GEOJSON_URL    = (
+    "https://raw.githubusercontent.com/codeforamerica/click_that_hood"
+    "/master/public/data/brazil-states.geojson"
+)
+
+
+def _carregar_geojson():
+    if GEOJSON_CACHE.exists():
+        with open(GEOJSON_CACHE, encoding="utf-8") as _f:
+            return json.load(_f)
+    try:
+        with urllib.request.urlopen(_GEOJSON_URL, timeout=15) as _r:
+            _data = json.loads(_r.read().decode("utf-8"))
+        GEOJSON_CACHE.parent.mkdir(parents=True, exist_ok=True)
+        with open(GEOJSON_CACHE, "w", encoding="utf-8") as _f:
+            json.dump(_data, _f)
+        return _data
+    except Exception:
+        return None
+
+
+UF_GEOJSON = _carregar_geojson()
 
 
 # ── Paleta do deck de apresentação — fonte única da verdade ───────────────────
@@ -98,6 +123,17 @@ _heat_base = (
     .query("300 <= MEDIA_OBJETIVAS <= 700 and 300 <= NU_NOTA_REDACAO <= 1000")
 )
 DF_HEAT_SAMPLE = _heat_base.sample(min(100_000, len(_heat_base)), random_state=42)
+
+_uf_base = df_municipio.dropna(subset=["SG_UF_PROVA", "MEDIA_GERAL", "TOTAL_PARTICIPANTES"])
+DF_UF = (
+    _uf_base
+    .assign(_PESO=_uf_base["MEDIA_GERAL"] * _uf_base["TOTAL_PARTICIPANTES"])
+    .groupby("SG_UF_PROVA")
+    .agg(_SOMA_PESO=("_PESO", "sum"), TOTAL_PARTICIPANTES=("TOTAL_PARTICIPANTES", "sum"))
+    .assign(MEDIA_GERAL=lambda d: d["_SOMA_PESO"] / d["TOTAL_PARTICIPANTES"])
+    .drop(columns="_SOMA_PESO")
+    .reset_index()
+)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -345,6 +381,13 @@ def layout_municipios():
                    style={"color": BODY, "fontSize": ".9rem"}),
         ], className="mb-4"),
         filtros,
+        dbc.Row([
+            dbc.Col(_grafico_card(
+                "Nota média por UF",
+                "Média geral ponderada pelo número de participantes por município",
+                "g3-mapa", altura=420,
+            ), md=12),
+        ], className="mb-4 g-3"),
         dbc.Row([
             dbc.Col(_grafico_card(
                 "Média geral por porte do município",
@@ -635,6 +678,42 @@ def atualizar_municipios(uf, min_part):
     fig_top.update_layout(coloraxis_showscale=False)
 
     return fig_pm, fig_pp, fig_sc, fig_top
+
+
+@app.callback(
+    Output("g3-mapa", "figure"),
+    Input("f3-uf", "value"),
+)
+def montar_mapa_uf(uf):
+    if UF_GEOJSON is None:
+        return _vazio_fig("GeoJSON indisponível — sem conexão ou arquivo data/uf_brasil.geojson ausente")
+    fig_mapa = px.choropleth(
+        DF_UF,
+        geojson=UF_GEOJSON,
+        locations="SG_UF_PROVA",
+        featureidkey="properties.sigla",
+        color="MEDIA_GERAL",
+        color_continuous_scale=["#CDEFE8", "#18BC9C", "#2C3E50"],
+        hover_name="SG_UF_PROVA",
+        hover_data={"TOTAL_PARTICIPANTES": True, "SG_UF_PROVA": False},
+        labels={"MEDIA_GERAL": "Média Geral", "TOTAL_PARTICIPANTES": "Participantes"},
+    )
+    if uf and uf != "Todas":
+        fig_mapa.add_trace(go.Choropleth(
+            geojson=UF_GEOJSON,
+            locations=[uf],
+            featureidkey="properties.sigla",
+            z=[1],
+            colorscale=[[0, "rgba(0,0,0,0)"], [1, "rgba(0,0,0,0)"]],
+            showscale=False,
+            marker_line_color=NAVY,
+            marker_line_width=3,
+            hoverinfo="skip",
+        ))
+    fig_mapa.update_geos(fitbounds="locations", visible=False)
+    _layout(fig_mapa)
+    fig_mapa.update_layout(margin=dict(l=0, r=0, t=10, b=0))
+    return fig_mapa
 
 
 # ── Execução ──────────────────────────────────────────────────────────────────
