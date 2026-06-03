@@ -436,7 +436,30 @@ def montar_visao_geral(_):
     _layout(fig_internet)
     fig_internet.update_layout(showlegend=False)
 
-    return fig_escola, fig_internet, _barras_renda(df_renda)
+    # Barra horizontal — média geral por faixa de renda
+    fig_renda = px.bar(
+        df_renda,
+        x="MEDIA_GERAL",
+        y=df_renda["RENDA_FAMILIAR"].astype(str),
+        orientation="h",
+        color="MEDIA_GERAL",
+        color_continuous_scale=["#bfdbfe", AZUL_MEDIO, AZUL_ESCURO],
+        text="MEDIA_GERAL",
+        labels={"MEDIA_GERAL": "Média Geral", "y": ""},
+    )
+    fig_renda.update_traces(
+        texttemplate="%{x:.1f}",
+        textposition="outside",
+        hovertemplate="<b>%{y}</b><br>Média Geral: %{x:.1f}<extra></extra>",
+    )
+    fig_renda.update_xaxes(range=[350, 850])
+    _layout(fig_renda)
+    fig_renda.update_layout(
+        coloraxis_showscale=False,
+        margin=dict(l=40, r=20, t=20, b=50),
+    )
+
+    return fig_escola, fig_internet, fig_renda
 
 
 @app.callback(
